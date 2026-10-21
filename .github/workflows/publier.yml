@@ -63,12 +63,15 @@ jobs:
 
       - name: Construire
         # Runtime et SDK du manifeste pris sur Flathub ; pas de FUSE sur les exécuteurs GitHub.
+        # Dossiers de travail hors du code : un manifeste qui copie son dépôt (source `dir`) les
+        # emporterait sinon dans le paquet.
         run: |
           flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse \
-            --default-branch="$BRANCHE" --repo=repo --force-clean build "$MANIFESTE"
+            --state-dir="$RUNNER_TEMP/etat" --default-branch="$BRANCHE" --repo="$RUNNER_TEMP/depot" \
+            --force-clean "$RUNNER_TEMP/construction" "$MANIFESTE"
 
       - name: Emballer en OCI
-        run: flatpak build-bundle --oci repo bundle "$APPLI" "$BRANCHE"
+        run: flatpak build-bundle --oci "$RUNNER_TEMP/depot" "$RUNNER_TEMP/paquet" "$APPLI" "$BRANCHE"
 
       - name: Pousser sur ghcr.io
         id: image
@@ -77,9 +80,10 @@ jobs:
         run: |
           image="ghcr.io/${PROPRIETAIRE,,}/$PAQUET"
           echo "$JETON" | skopeo login ghcr.io -u "${{ github.actor }}" --password-stdin
-          ref=$(jq -r '.manifests[0].annotations["org.opencontainers.image.ref.name"]' bundle/index.json)
-          skopeo copy "oci:bundle:$ref" "docker://$image:latest"
-          skopeo copy "oci:bundle:$ref" "docker://$image:${GITHUB_SHA::12}"
+          oci="$RUNNER_TEMP/paquet"
+          ref=$(jq -r '.manifests[0].annotations["org.opencontainers.image.ref.name"]' "$oci/index.json")
+          skopeo copy "oci:$oci:$ref" "docker://$image:latest"
+          skopeo copy "oci:$oci:$ref" "docker://$image:${GITHUB_SHA::12}"
           # Empreinte du manifeste tel que le registre le sert : celle que Flatpak vérifiera.
           echo "digest=sha256:$(skopeo inspect --raw "docker://$image:latest" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
@@ -93,7 +97,7 @@ jobs:
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
         run: |
-          python3 -I index/outils/entree.py bundle "${PROPRIETAIRE,,}/$PAQUET" "$DIGEST" latest \
+          python3 -I index/outils/entree.py "$RUNNER_TEMP/paquet" "${PROPRIETAIRE,,}/$PAQUET" "$DIGEST" latest \
             > "index/entrees/$APPLI.json"
           cd index
           git config user.name "github-actions[bot]"
