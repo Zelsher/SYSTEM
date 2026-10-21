@@ -53,7 +53,7 @@ jobs:
       BRANCHE: ${{ inputs.branche }}
       PROPRIETAIRE: ${{ github.repository_owner }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Outils
         run: |
@@ -83,7 +83,7 @@ jobs:
           # Empreinte du manifeste tel que le registre le sert : celle que Flatpak vérifiera.
           echo "digest=sha256:$(skopeo inspect --raw "docker://$image:latest" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Zelsher/arrsa-systemes
           token: ${{ secrets.INDEX_TOKEN }}
