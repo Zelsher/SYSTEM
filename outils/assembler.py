@@ -15,6 +15,14 @@ import sys
 from pathlib import Path
 
 REGISTRY = "https://ghcr.io/"
+# Pour ajouter le dépôt à la main : flatpak remote-add --from <site>/arrsa-systemes.flatpakrepo
+# (ARRSA OS le déclare déjà dans son image). Pas de clé GPG : dépôt OCI.
+FLATPAKREPO = """[Flatpak Repo]
+Title=Systèmes d'ARRSA
+Url=oci+https://zelsher.github.io/arrsa-systemes
+Homepage=https://github.com/Zelsher/arrsa-systemes
+Comment=Paquets privés sur ghcr.io : un jeton read:packages est nécessaire
+"""
 
 
 def assemble(entries: Path) -> dict:
@@ -38,6 +46,7 @@ def main(argv: list[str]) -> None:
     (site / "index").mkdir(parents=True, exist_ok=True)
     index = assemble(Path(argv[1]))
     (site / "index" / "static").write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
+    (site / "arrsa-systemes.flatpakrepo").write_text(FLATPAKREPO)
     print(f"{len(index['Results'])} appli(s) dans l'index")
 
 
