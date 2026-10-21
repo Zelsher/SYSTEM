@@ -1,0 +1,83 @@
+# Catalogue des systèmes (ADR 0140 d'ARRSA) : lit les images de systemes.toml sur ghcr.io avec le jeton
+# éphémère de ce robot (chaque paquet donne au dépôt l'accès Read, « Manage Actions access ») et publie
+# l'index sur GitHub Pages (oci+https://zelsher.github.io/arrsa-systemes) quand il a changé.
+# Pages sert avec Cache-Control: max-age=600 : une version publiée se voit en ~25 min au plus.
+#
+# GitHub coupe un robot planifié après 60 jours sans activité dans un dépôt public : le passage du
+# 1er de chaque mois committe .vivant pour que ça n'arrive jamais.
+name: Catalogue
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"  # pas à l'heure pile : GitHub y retarde ou saute des passages
+    - cron: "41 5 1 * *"          # vie du dépôt, une fois par mois
+  push:
+    branches: [main]
+    paths:
+      - "systemes.toml"
+      - "outils/catalogue.py"
+      - ".github/workflows/catalogue.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: catalogue
+  cancel-in-progress: false
+
+jobs:
+  vivant:
+    if: github.event.schedule == '41 5 1 * *'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: |
+          date -u +%F > .vivant
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .vivant
+          git commit -q -m "Catalogue vivant : $(date -u +%F)"
+          git push -q
+
+  catalogue:
+    if: github.event.schedule != '41 5 1 * *'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      packages: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Lire l'entrepôt
+        env:
+          JETON: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          command -v skopeo >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q skopeo; }
+          echo "$JETON" | skopeo login ghcr.io -u "${{ github.actor }}" --password-stdin
+          python3 -I outils/catalogue.py systemes.toml site
+
+      - name: Changé ?
+        id: change
+        # Le passage planifié ne republie que si l'index diffère de celui en ligne.
+        run: |
+          if [ "${{ github.event_name }}" = schedule ] &&
+             curl -fsS https://zelsher.github.io/arrsa-systemes/index/static | cmp -s - site/index/static; then
+            echo "publier=non" >> "$GITHUB_OUTPUT"; echo "Index inchangé."
+          else
+            echo "publier=oui" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.change.outputs.publier == 'oui'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - if: steps.change.outputs.publier == 'oui'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+      - if: steps.change.outputs.publier == 'oui'
+        id: deploiement
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

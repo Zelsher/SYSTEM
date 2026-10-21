@@ -1,0 +1,9 @@
+# Les systèmes du catalogue : le robot lit ghcr.io/zelsher/<paquet>:latest de chacun.
+# Pour en ajouter un : une entrée ici, et dans les réglages du paquet sur GitHub, « Manage Actions
+# access » → ajouter le dépôt arrsa-systemes, rôle Read (le paquet est privé).
+
+# Paquet d'essai de l'option B (2026-10-21) : vérifie que le robot lit un paquet privé. À retirer.
+[[systeme]]
+code = "S99"
+appli = "org.arrsa.EssaiSysteme"
+paquet = "arrsa-essai-systeme"

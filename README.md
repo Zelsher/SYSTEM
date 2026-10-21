@@ -26,10 +26,12 @@ l'index.
 1. Le dépôt du système a un manifeste `flatpak-builder` qui installe sa fiche
    (`/app/share/arrsa/systeme.toml`) et met `X-Arrsa-Systeme=<code>` dans son `.desktop`.
 2. Son intégration continue appelle [`publier.yml`](.github/workflows/publier.yml) (exemple en
-   tête du fichier), avec le secret `INDEX_TOKEN` : un jeton fine-grained limité à ce dépôt,
-   droit Contents en écriture.
-3. La publication pousse l'image, écrit `entrees/<appli>.json`, et
-   [`pages.yml`](.github/workflows/pages.yml) refait `index/static` sur GitHub Pages.
+   tête du fichier) : le Flatpak part en image privée sur `ghcr.io/zelsher/<paquet>`. Aucun secret.
+3. Une fois, après la première publication : une entrée dans [`systemes.toml`](systemes.toml), et
+   dans les réglages du paquet sur GitHub, « Manage Actions access » → `arrsa-systemes`, rôle Read.
 
-Outils : `outils/entree.py` (entrée d'une appli depuis son paquet OCI), `outils/assembler.py`
-(index depuis les entrées).
+Le robot [`catalogue.yml`](.github/workflows/catalogue.yml) lit ces images toutes les 15 minutes
+avec son jeton éphémère et republie l'index s'il a changé. Les systèmes n'écrivent jamais ici :
+aucune clé durable ne peut modifier ce que les machines installent.
+
+Outil : `outils/catalogue.py` (l'index depuis les images).

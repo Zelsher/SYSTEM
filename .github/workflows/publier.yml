@@ -1,18 +1,17 @@
 # Publier un système (ADR 0140 d'ARRSA) : appelée par l'intégration continue du système, depuis
-# son propre dépôt (privé). Construit son Flatpak, le pousse en image OCI privée sur
-# ghcr.io/<propriétaire>/<paquet>, puis écrit son entrée dans entrees/ de ce dépôt-ci ; pages.yml
-# en refait l'index que lisent les machines. Seules les métadonnées de l'image sortent ici.
+# son propre dépôt (privé). Construit son Flatpak et le pousse en image OCI privée sur
+# ghcr.io/<propriétaire>/<paquet>:latest. Le système n'écrit rien dans ce dépôt-ci : le robot du
+# catalogue (catalogue.yml) lit l'image et refait l'index ; aucune clé à créer ni à renouveler.
 #
 # Dans le dépôt du système :
 #   jobs:
 #     publier:
 #       uses: Zelsher/arrsa-systemes/.github/workflows/publier.yml@main
 #       permissions: { contents: read, packages: write }
-#       with: { manifeste: flatpak/org.arrsa.Atlas.yml, appli: org.arrsa.Atlas, paquet: systemes-atlas }
-#       secrets: { INDEX_TOKEN: "${{ secrets.INDEX_TOKEN }}" }
+#       with: { manifeste: paquet/org.arrsa.Atlas.yml, appli: org.arrsa.Atlas, paquet: systemes-atlas }
 #
-# INDEX_TOKEN : jeton fine-grained limité à Zelsher/arrsa-systemes, droit Contents en écriture.
-# Le jeton automatique du système ne peut pas écrire dans un autre dépôt.
+# Après la première publication : ligne dans systemes.toml, et dans les réglages du paquet,
+# « Manage Actions access » → arrsa-systemes, rôle Read.
 name: Publier un système
 
 on:
@@ -35,9 +34,6 @@ on:
         required: false
         type: string
         default: stable
-    secrets:
-      INDEX_TOKEN:
-        required: true
 
 jobs:
   publier:
@@ -74,7 +70,6 @@ jobs:
         run: flatpak build-bundle --oci "$RUNNER_TEMP/depot" "$RUNNER_TEMP/paquet" "$APPLI" "$BRANCHE"
 
       - name: Pousser sur ghcr.io
-        id: image
         env:
           JETON: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -84,30 +79,4 @@ jobs:
           ref=$(jq -r '.manifests[0].annotations["org.opencontainers.image.ref.name"]' "$oci/index.json")
           skopeo copy "oci:$oci:$ref" "docker://$image:latest"
           skopeo copy "oci:$oci:$ref" "docker://$image:${GITHUB_SHA::12}"
-          # Empreinte du manifeste tel que le registre le sert : celle que Flatpak vérifiera.
-          echo "digest=sha256:$(skopeo inspect --raw "docker://$image:latest" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: Zelsher/arrsa-systemes
-          token: ${{ secrets.INDEX_TOKEN }}
-          path: index
-
-      - name: Écrire l'entrée de l'index
-        env:
-          DIGEST: ${{ steps.image.outputs.digest }}
-        run: |
-          python3 -I index/outils/entree.py "$RUNNER_TEMP/paquet" "${PROPRIETAIRE,,}/$PAQUET" "$DIGEST" latest \
-            > "index/entrees/$APPLI.json"
-          cd index
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "entrees/$APPLI.json"
-          git diff --cached --quiet && { echo "Entrée inchangée."; exit 0; }
-          git commit -q -m "$APPLI : ${GITHUB_SHA::12} de ${{ github.repository }}"
-          # Deux systèmes peuvent publier en même temps : chacun ne touche que son fichier.
-          for _ in 1 2 3 4 5; do
-            git push -q && exit 0
-            git pull -q --rebase
-          done
-          exit 1
+          echo "Publié : $image (le catalogue le verra à son prochain passage, 15 min au plus)."
