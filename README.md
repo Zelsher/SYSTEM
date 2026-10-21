@@ -24,7 +24,8 @@ l'index.
 ## Publier un système
 
 1. Le dépôt du système a un manifeste `flatpak-builder` qui installe sa fiche
-   (`/app/share/arrsa/systeme.toml`) et met `X-Arrsa-Systeme=<code>` dans son `.desktop`.
+   (`/app/share/arrsa/systeme.toml`) : ARRSA y lit son code (Flatpak retire les clés `X-…`
+   inconnues du `.desktop`).
 2. Son intégration continue appelle [`publier.yml`](.github/workflows/publier.yml) (exemple en
    tête du fichier) : le Flatpak part en image privée sur `ghcr.io/zelsher/<paquet>`. Aucun secret.
 3. Une fois, après la première publication : une entrée dans [`systemes.toml`](systemes.toml), et
