@@ -40,7 +40,11 @@ Comment=Paquets privés sur ghcr.io : un jeton read:packages est nécessaire
 
 
 def skopeo(*args: str) -> bytes:
-    return subprocess.run(["skopeo", "inspect", "--raw", *args], check=True, capture_output=True).stdout
+    done = subprocess.run(["skopeo", "inspect", "--raw", *args], capture_output=True)
+    if done.returncode:
+        # « unauthorized » / « denied » : le paquet n'a pas donné l'accès Read à ce dépôt.
+        raise SystemExit(f"{args[-1]} illisible : {done.stderr.decode().strip()}")
+    return done.stdout
 
 
 def read_list(path: Path) -> list[dict]:
