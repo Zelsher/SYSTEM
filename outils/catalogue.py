@@ -48,7 +48,7 @@ def skopeo(*args: str) -> bytes:
 
 
 def read_list(path: Path) -> list[dict]:
-    systems = tomllib.loads(path.read_text())["systeme"]
+    systems = tomllib.loads(path.read_text()).get("systeme", [])
     seen: set[str] = set()
     for s in systems:
         if not (APP_ID.match(s["appli"]) and PACKAGE.match(s["paquet"])):
