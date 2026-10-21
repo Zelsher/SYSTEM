@@ -6,3 +6,8 @@
 # code = "S1"
 # appli = "org.arrsa.Atlas"
 # paquet = "systemes-atlas"
+
+[[systeme]]
+code = "S1"
+appli = "org.arrsa.Atlas"
+paquet = "systemes-atlas"
